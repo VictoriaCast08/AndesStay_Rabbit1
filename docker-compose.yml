@@ -1,0 +1,62 @@
+services:
+  # NODO 1 DE RABBITMQ (Nodo Principal del Clúster)
+  rabbitmq-node1:
+    image: rabbitmq:3.13-management-alpine
+    container_name: rabbitmq-node1
+    hostname: rabbitmq-node1
+    restart: unless-stopped
+    ports:
+      - "5672:5672"     # Puerto AMQP Principal (Instancia A se conecta aquí)
+      - "15672:15672"   # Consola Web Principal
+    environment:
+      RABBITMQ_ERLANG_COOKIE: "SECRET_COOKIE_CLUSTER_ANDESSTAY"
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-andesstay_admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-AndesStay2026!}
+    volumes:
+      - rabbitmq_node1_data:/var/lib/rabbitmq
+    networks:
+      - rabbitmq-cluster-net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # NODO 2 DE RABBITMQ (Nodo Réplica unido automáticamente al Clúster)
+  rabbitmq-node2:
+    image: rabbitmq:3.13-management-alpine
+    container_name: rabbitmq-node2
+    hostname: rabbitmq-node2
+    restart: unless-stopped
+    ports:
+      - "5673:5672"     # Puerto AMQP Nodo 2 (Respaldo)
+      - "15673:15672"   # Consola Web Nodo 2
+    environment:
+      RABBITMQ_ERLANG_COOKIE: "SECRET_COOKIE_CLUSTER_ANDESSTAY"
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-andesstay_admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-AndesStay2026!}
+    volumes:
+      - rabbitmq_node2_data:/var/lib/rabbitmq
+    networks:
+      - rabbitmq-cluster-net
+    depends_on:
+      rabbitmq-node1:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "
+      rabbitmq-server -detached &&
+      sleep 10 &&
+      rabbitmqctl stop_app &&
+      rabbitmqctl reset &&
+      rabbitmqctl join_cluster rabbit@rabbitmq-node1 &&
+      rabbitmqctl start_app &&
+      tail -f /dev/null
+      "
+
+networks:
+  rabbitmq-cluster-net:
+    driver: bridge
+
+volumes:
+  rabbitmq_node1_data:
+  rabbitmq_node2_data:
