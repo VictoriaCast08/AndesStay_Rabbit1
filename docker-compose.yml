@@ -6,7 +6,7 @@ services:
     hostname: rabbitmq-node1
     restart: unless-stopped
     ports:
-      - "5672:5672"     # Puerto AMQP Principal (Instancia A se conecta aquí)
+      - "5672:5672"     # Puerto AMQP Principal
       - "15672:15672"   # Consola Web Principal
     environment:
       RABBITMQ_ERLANG_COOKIE: "SECRET_COOKIE_CLUSTER_ANDESSTAY"
@@ -29,7 +29,7 @@ services:
     hostname: rabbitmq-node2
     restart: unless-stopped
     ports:
-      - "5673:5672"     # Puerto AMQP Nodo 2 (Respaldo)
+      - "5673:5672"     # Puerto AMQP Nodo 2 (Failover / Respaldo)
       - "15673:15672"   # Consola Web Nodo 2
     environment:
       RABBITMQ_ERLANG_COOKIE: "SECRET_COOKIE_CLUSTER_ANDESSTAY"
@@ -44,13 +44,14 @@ services:
         condition: service_healthy
     entrypoint: >
       sh -c "
-      rabbitmq-server -detached &&
-      sleep 10 &&
+      docker-entrypoint.sh rabbitmq-server &
+      RABBIT_PID=$$!;
+      rabbitmqctl await_startup &&
       rabbitmqctl stop_app &&
       rabbitmqctl reset &&
       rabbitmqctl join_cluster rabbit@rabbitmq-node1 &&
       rabbitmqctl start_app &&
-      tail -f /dev/null
+      wait $$RABBIT_PID
       "
 
 networks:
