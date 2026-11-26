@@ -46,11 +46,12 @@ services:
       sh -c "
       docker-entrypoint.sh rabbitmq-server &
       RABBIT_PID=$$!;
+      sleep 12;
       rabbitmqctl await_startup &&
       rabbitmqctl stop_app &&
       rabbitmqctl reset &&
       rabbitmqctl join_cluster rabbit@rabbitmq-node1 &&
-      rabbitmqctl start_app &&
+      rabbitmqctl start_app;
       wait $$RABBIT_PID
       "
 
